@@ -99,6 +99,194 @@ func main() {
 		}).
 		Build()
 
+	// Создаем полную форму с использованием всех типов полей
+	completeForm := formist.NewForm("complete_example", "Полный пример всех типов полей").
+		// 1. Text field
+		AddField(types.Field{
+			Name:        "username",
+			Type:        types.FieldTypeText,
+			Label:       "Имя пользователя",
+			Required:    true,
+			Placeholder: "Введите имя пользователя",
+		}).
+		// 2. Email field
+		AddField(types.Field{
+			Name:     "user_email",
+			Type:     types.FieldTypeEmail,
+			Label:    "Email адрес",
+			Required: true,
+			Validation: []types.ValidationRule{
+				{Type: "email", Message: "Введите корректный email"},
+			},
+		}).
+		// 3. Password field
+		AddField(types.Field{
+			Name:        "user_password",
+			Type:        types.FieldTypePassword,
+			Label:       "Пароль",
+			Required:    true,
+			Placeholder: "Введите пароль",
+		}).
+		// 4. Number field
+		AddField(types.Field{
+			Name:         "age",
+			Type:         types.FieldTypeNumber,
+			Label:        "Возраст",
+			Required:     false,
+			DefaultValue: 18,
+			Validation: []types.ValidationRule{
+				{Type: "min", Value: 0, Message: "Возраст не может быть отрицательным"},
+				{Type: "max", Value: 120, Message: "Возраст не может быть больше 120"},
+			},
+		}).
+		// 5. Textarea field
+		AddField(types.Field{
+			Name:        "bio",
+			Type:        types.FieldTypeTextarea,
+			Label:       "Биография",
+			Placeholder: "Расскажите о себе...",
+			Config: map[string]interface{}{
+				"rows": 4,
+			},
+		}).
+		// 6. Select field
+		AddField(types.Field{
+			Name:     "country",
+			Type:     types.FieldTypeSelect,
+			Label:    "Страна",
+			Required: true,
+			Options: []types.SelectOption{
+				{Value: "ru", Label: "Россия"},
+				{Value: "us", Label: "США"},
+				{Value: "de", Label: "Германия"},
+				{Value: "fr", Label: "Франция"},
+			},
+		}).
+		// 7. Radio field
+		AddField(types.Field{
+			Name:     "gender",
+			Type:     types.FieldTypeRadio,
+			Label:    "Пол",
+			Required: true,
+			Options: []types.SelectOption{
+				{Value: "male", Label: "Мужской"},
+				{Value: "female", Label: "Женский"},
+				{Value: "other", Label: "Другой"},
+			},
+		}).
+		// 8. Checkbox field
+		AddField(types.Field{
+			Name:         "newsletter",
+			Type:         types.FieldTypeCheckbox,
+			Label:        "Подписаться на рассылку",
+			DefaultValue: false,
+		}).
+		// 9. Date field
+		AddField(types.Field{
+			Name:     "birth_date",
+			Type:     types.FieldTypeDate,
+			Label:    "Дата рождения",
+			Required: false,
+		}).
+		// 10. Time field
+		AddField(types.Field{
+			Name:  "preferred_time",
+			Type:  types.FieldTypeTime,
+			Label: "Предпочитаемое время звонка",
+		}).
+		// 11. File field
+		AddField(types.Field{
+			Name:  "avatar",
+			Type:  types.FieldTypeFile,
+			Label: "Аватар",
+			Config: map[string]interface{}{
+				"accept": "image/*",
+			},
+		}).
+		// 12. Hidden field
+		AddField(types.Field{
+			Name:         "user_id",
+			Type:         types.FieldTypeHidden,
+			DefaultValue: "hidden_user_123",
+		}).
+		// 13. Table field
+		AddField(types.Field{
+			Name:  "skills_table",
+			Type:  types.FieldTypeTable,
+			Label: "Навыки и опыт",
+			TableConfig: &types.TableConfig{
+				Columns: []types.TableColumn{
+					{
+						Key:   "skill",
+						Title: "Навык",
+						Type:  types.FieldTypeText,
+						Width: "40%",
+					},
+					{
+						Key:   "level",
+						Title: "Уровень",
+						Type:  types.FieldTypeSelect,
+						Width: "30%",
+						Options: []types.SelectOption{
+							{Value: "beginner", Label: "Начинающий"},
+							{Value: "intermediate", Label: "Средний"},
+							{Value: "advanced", Label: "Продвинутый"},
+							{Value: "expert", Label: "Эксперт"},
+						},
+					},
+					{
+						Key:   "years",
+						Title: "Лет опыта",
+						Type:  types.FieldTypeNumber,
+						Width: "30%",
+					},
+				},
+				Pagination: false,
+				Sortable:   true,
+				Editable:   true,
+				OnGet: func(page, limit int, filters map[string]interface{}) (types.TableData, error) {
+					return types.TableData{
+						Columns: []types.TableColumn{
+							{Key: "skill", Title: "Навык", Type: types.FieldTypeText},
+							{Key: "level", Title: "Уровень", Type: types.FieldTypeSelect},
+							{Key: "years", Title: "Лет опыта", Type: types.FieldTypeNumber},
+						},
+						Rows: []map[string]interface{}{
+							{"skill": "Go", "level": "expert", "years": 5},
+							{"skill": "JavaScript", "level": "advanced", "years": 3},
+							{"skill": "Python", "level": "intermediate", "years": 2},
+						},
+						Total: 3,
+						Page:  1,
+						Limit: 10,
+					}, nil
+				},
+			},
+		}).
+		OnGet(func() (interface{}, error) {
+			// Возвращаем предзаполненные данные для демонстрации
+			return map[string]interface{}{
+				"username":       "demo_user",
+				"user_email":     "demo@example.com",
+				"age":            25,
+				"bio":            "Это демонстрационная биография пользователя",
+				"country":        "ru",
+				"gender":         "male",
+				"newsletter":     true,
+				"birth_date":     "1999-01-15",
+				"preferred_time": "14:30",
+				"user_id":        "hidden_user_123",
+			}, nil
+		}).
+		OnPost(func(data map[string]interface{}) (interface{}, error) {
+			fmt.Printf("Полная форма отправлена: %+v\n", data)
+			return map[string]interface{}{
+				"message": "Форма успешно обработана!",
+				"data":    data,
+			}, nil
+		}).
+		Build()
+
 	// Создаем кастомную страницу
 	dashboardPage := formist.NewPage("dashboard", "Панель управления").
 		WithContent(`
@@ -120,6 +308,7 @@ func main() {
 		Build()
 
 	// Регистрируем формы и страницы
+	admin.RegisterForm(completeForm)
 	admin.RegisterForm(userForm)
 	admin.RegisterForm(settingsForm)
 	admin.RegisterPage(dashboardPage)
@@ -201,6 +390,6 @@ fetch('http://localhost:8080/api/routes')
 	fmt.Println("Сервер запущен на http://localhost:8080")
 	fmt.Println("Админка доступна на http://localhost:8080/admin/")
 	fmt.Println("API роутов: http://localhost:8080/api/routes")
-	
+
 	log.Fatal(http.ListenAndServe(":8080", admin.Handler()))
 }
