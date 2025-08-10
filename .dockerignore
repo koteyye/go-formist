@@ -1,0 +1,45 @@
+# Git файлы
+.git
+.gitignore
+
+# Временные файлы Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Директории IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS файлы
+.DS_Store
+Thumbs.db
+
+# Docker файлы
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Документация
+README.md
+*.md
+docs/
+
+# Тестовые данные
+testdata/
+*_test.go
+
+# Логи
+*.log
+
+# Временные файлы
+tmp/
+temp/
