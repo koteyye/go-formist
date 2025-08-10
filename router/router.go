@@ -17,14 +17,15 @@ import (
 
 // Router представляет HTTP роутер для админки
 type Router struct {
-	mux         *chi.Mux
-	forms       map[string]*types.Form
-	pages       map[string]*types.Page
-	title       string
-	authEnabled bool
-	corsEnabled bool
-	corsOrigins []string
-	middlewares []types.MiddlewareFunc
+	mux             *chi.Mux
+	forms           map[string]*types.Form
+	pages           map[string]*types.Page
+	title           string
+	authEnabled     bool
+	corsEnabled     bool
+	corsOrigins     []string
+	middlewares     []types.MiddlewareFunc
+	storageHandlers map[string]http.HandlerFunc
 }
 
 // NewRouter создает новый роутер
@@ -62,6 +63,10 @@ func (r *Router) EnableCORS(enabled bool, origins ...string) {
 	if len(origins) > 0 {
 		r.corsOrigins = origins
 	}
+	// Пересоздаем mux с новыми настройками
+	r.mux = chi.NewRouter()
+	r.setupMiddleware()
+	r.setupRoutes()
 }
 
 // AddMiddleware добавляет middleware
@@ -82,6 +87,11 @@ func (r *Router) RegisterPage(page *types.Page) {
 // Handler возвращает HTTP handler
 func (r *Router) Handler() http.Handler {
 	return r.mux
+}
+
+// SetStorageHandlers устанавливает обработчики для работы со storage
+func (r *Router) SetStorageHandlers(handlers map[string]http.HandlerFunc) {
+	r.storageHandlers = handlers
 }
 
 // setupMiddleware настраивает middleware
@@ -132,6 +142,66 @@ func (r *Router) setupRoutes() {
 			adminRouter.Post("/login", r.handleLogin)
 			adminRouter.Post("/logout", r.handleLogout)
 		}
+	})
+
+	// API роуты (вне /admin для удобства)
+	r.mux.Route("/api", func(apiRouter chi.Router) {
+		apiRouter.Route("/routes", func(routesRouter chi.Router) {
+			// GET /api/routes - получить все роуты
+			routesRouter.Get("/", func(w http.ResponseWriter, req *http.Request) {
+				if r.storageHandlers != nil {
+					if handler, ok := r.storageHandlers["getRoutes"]; ok {
+						handler(w, req)
+						return
+					}
+				}
+				http.Error(w, "Storage not configured", http.StatusNotImplemented)
+			})
+
+			// GET /api/routes/{id} - получить роут по ID
+			routesRouter.Get("/{id}", func(w http.ResponseWriter, req *http.Request) {
+				if r.storageHandlers != nil {
+					if handler, ok := r.storageHandlers["getRoute"]; ok {
+						handler(w, req)
+						return
+					}
+				}
+				http.Error(w, "Storage not configured", http.StatusNotImplemented)
+			})
+
+			// POST /api/routes - создать новый роут
+			routesRouter.Post("/", func(w http.ResponseWriter, req *http.Request) {
+				if r.storageHandlers != nil {
+					if handler, ok := r.storageHandlers["createRoute"]; ok {
+						handler(w, req)
+						return
+					}
+				}
+				http.Error(w, "Storage not configured", http.StatusNotImplemented)
+			})
+
+			// PUT /api/routes/{id} - обновить роут
+			routesRouter.Put("/{id}", func(w http.ResponseWriter, req *http.Request) {
+				if r.storageHandlers != nil {
+					if handler, ok := r.storageHandlers["updateRoute"]; ok {
+						handler(w, req)
+						return
+					}
+				}
+				http.Error(w, "Storage not configured", http.StatusNotImplemented)
+			})
+
+			// DELETE /api/routes/{id} - удалить роут
+			routesRouter.Delete("/{id}", func(w http.ResponseWriter, req *http.Request) {
+				if r.storageHandlers != nil {
+					if handler, ok := r.storageHandlers["deleteRoute"]; ok {
+						handler(w, req)
+						return
+					}
+				}
+				http.Error(w, "Storage not configured", http.StatusNotImplemented)
+			})
+		})
 	})
 }
 
@@ -299,7 +369,7 @@ func (r *Router) handleLogout(w http.ResponseWriter, req *http.Request) {
 func (r *Router) validateFormData(form *types.Form, data map[string]interface{}) error {
 	for _, field := range form.Fields {
 		value, exists := data[field.Name]
-		
+
 		// Проверяем обязательные поля
 		if field.Required && (!exists || isEmpty(value)) {
 			return fmt.Errorf("поле '%s' обязательно для заполнения", field.Label)
@@ -348,7 +418,7 @@ func (r *Router) validateEmail(value interface{}, message string) error {
 
 	if !strings.Contains(str, "@") || !strings.Contains(str, ".") {
 		if message != "" {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return fmt.Errorf("некорректный email адрес")
 	}
@@ -370,7 +440,7 @@ func (r *Router) validateMin(value interface{}, minValue interface{}, message st
 
 	if num < min {
 		if message != "" {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return fmt.Errorf("значение должно быть не менее %v", min)
 	}
@@ -392,7 +462,7 @@ func (r *Router) validateMax(value interface{}, maxValue interface{}, message st
 
 	if num > max {
 		if message != "" {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return fmt.Errorf("значение должно быть не более %v", max)
 	}
@@ -414,7 +484,7 @@ func (r *Router) validateMinLength(value interface{}, minLength interface{}, mes
 
 	if len(str) < min {
 		if message != "" {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return fmt.Errorf("длина должна быть не менее %d символов", min)
 	}
@@ -436,7 +506,7 @@ func (r *Router) validateMaxLength(value interface{}, maxLength interface{}, mes
 
 	if len(str) > max {
 		if message != "" {
-			return fmt.Errorf(message)
+			return fmt.Errorf("%s", message)
 		}
 		return fmt.Errorf("длина должна быть не более %d символов", max)
 	}

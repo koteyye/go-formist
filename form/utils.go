@@ -14,30 +14,30 @@ import (
 // FromStruct создает форму из Go структуры
 func FromStruct(name, title string, structType interface{}) *FormBuilder {
 	fb := NewForm(name, title)
-	
+
 	t := reflect.TypeOf(structType)
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
 	}
-	
+
 	if t.Kind() != reflect.Struct {
 		return fb
 	}
-	
+
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		
+
 		// Пропускаем неэкспортируемые поля
 		if !field.IsExported() {
 			continue
 		}
-		
+
 		formField := createFieldFromStructField(field)
 		if formField.Name != "" {
 			fb.AddField(formField)
 		}
 	}
-	
+
 	return fb
 }
 
@@ -50,7 +50,7 @@ func createFieldFromStructField(field reflect.StructField) types.Field {
 		Required:   getFieldRequired(field),
 		Validation: make([]types.ValidationRule, 0),
 	}
-	
+
 	// Добавляем валидацию для email полей
 	if formField.Type == types.FieldTypeEmail {
 		formField.Validation = append(formField.Validation, types.ValidationRule{
@@ -58,7 +58,7 @@ func createFieldFromStructField(field reflect.StructField) types.Field {
 			Message: "Введите корректный email",
 		})
 	}
-	
+
 	return formField
 }
 
@@ -107,14 +107,14 @@ func getFieldType(field reflect.StructField) types.FieldType {
 			return types.FieldTypeNumber
 		}
 	}
-	
+
 	// Определяем по типу Go
 	switch field.Type.Kind() {
 	case reflect.Bool:
 		return types.FieldTypeCheckbox
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		 reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		 reflect.Float32, reflect.Float64:
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
 		return types.FieldTypeNumber
 	case reflect.String:
 		// Проверяем имя поля для определения типа
@@ -169,19 +169,19 @@ func ValidateField(field *types.Field, value interface{}) error {
 	if field.Required && isEmpty(value) {
 		return errors.New("поле обязательно для заполнения")
 	}
-	
+
 	// Если поле пустое и не обязательное, пропускаем валидацию
 	if isEmpty(value) {
 		return nil
 	}
-	
+
 	// Применяем правила валидации
 	for _, rule := range field.Validation {
 		if err := validateRule(value, rule); err != nil {
 			return err
 		}
 	}
-	
+
 	return nil
 }
 
@@ -190,7 +190,7 @@ func isEmpty(value interface{}) bool {
 	if value == nil {
 		return true
 	}
-	
+
 	switch v := value.(type) {
 	case string:
 		return strings.TrimSpace(v) == ""
@@ -227,7 +227,7 @@ func validateEmail(value interface{}, message string) error {
 	if !ok {
 		return errors.New("значение должно быть строкой")
 	}
-	
+
 	emailRegex := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 	if !emailRegex.MatchString(str) {
 		if message != "" {
@@ -235,7 +235,7 @@ func validateEmail(value interface{}, message string) error {
 		}
 		return errors.New("некорректный email адрес")
 	}
-	
+
 	return nil
 }
 
@@ -245,19 +245,19 @@ func validateMin(value interface{}, minValue interface{}, message string) error 
 	if err != nil {
 		return err
 	}
-	
+
 	min, err := toFloat64(minValue)
 	if err != nil {
 		return err
 	}
-	
+
 	if num < min {
 		if message != "" {
 			return errors.New(message)
 		}
 		return fmt.Errorf("значение должно быть не менее %v", min)
 	}
-	
+
 	return nil
 }
 
@@ -267,19 +267,19 @@ func validateMax(value interface{}, maxValue interface{}, message string) error 
 	if err != nil {
 		return err
 	}
-	
+
 	max, err := toFloat64(maxValue)
 	if err != nil {
 		return err
 	}
-	
+
 	if num > max {
 		if message != "" {
 			return errors.New(message)
 		}
 		return fmt.Errorf("значение должно быть не более %v", max)
 	}
-	
+
 	return nil
 }
 
@@ -289,19 +289,19 @@ func validateMinLength(value interface{}, minLength interface{}, message string)
 	if !ok {
 		return errors.New("значение должно быть строкой")
 	}
-	
+
 	min, err := toInt(minLength)
 	if err != nil {
 		return err
 	}
-	
+
 	if len(str) < min {
 		if message != "" {
 			return errors.New(message)
 		}
 		return fmt.Errorf("длина должна быть не менее %d символов", min)
 	}
-	
+
 	return nil
 }
 
@@ -311,19 +311,19 @@ func validateMaxLength(value interface{}, maxLength interface{}, message string)
 	if !ok {
 		return errors.New("значение должно быть строкой")
 	}
-	
+
 	max, err := toInt(maxLength)
 	if err != nil {
 		return err
 	}
-	
+
 	if len(str) > max {
 		if message != "" {
 			return errors.New(message)
 		}
 		return fmt.Errorf("длина должна быть не более %d символов", max)
 	}
-	
+
 	return nil
 }
 
@@ -333,24 +333,24 @@ func validatePattern(value interface{}, pattern interface{}, message string) err
 	if !ok {
 		return errors.New("значение должно быть строкой")
 	}
-	
+
 	patternStr, ok := pattern.(string)
 	if !ok {
 		return errors.New("паттерн должен быть строкой")
 	}
-	
+
 	regex, err := regexp.Compile(patternStr)
 	if err != nil {
 		return fmt.Errorf("некорректное регулярное выражение: %v", err)
 	}
-	
+
 	if !regex.MatchString(str) {
 		if message != "" {
 			return errors.New(message)
 		}
 		return errors.New("значение не соответствует требуемому формату")
 	}
-	
+
 	return nil
 }
 

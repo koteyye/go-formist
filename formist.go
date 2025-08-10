@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/koteyye/go-formist/form"
 	"github.com/koteyye/go-formist/router"
 	"github.com/koteyye/go-formist/storage"
@@ -58,7 +59,7 @@ func (a *Admin) AddMiddleware(middleware types.MiddlewareFunc) *Admin {
 // RegisterForm регистрирует форму и сохраняет роут в storage
 func (a *Admin) RegisterForm(form *types.Form) *Admin {
 	a.router.RegisterForm(form)
-	
+
 	// Сохраняем роут в storage если он подключен
 	if a.storage != nil {
 		route := &storage.Route{
@@ -67,22 +68,22 @@ func (a *Admin) RegisterForm(form *types.Form) *Admin {
 			Title: form.Title,
 			Type:  "form",
 		}
-		
+
 		if form.Description != "" {
 			route.Description = form.Description
 		}
-		
+
 		// Игнорируем ошибку, чтобы не ломать работу если storage недоступен
 		_ = a.storage.SaveRoute(context.Background(), route)
 	}
-	
+
 	return a
 }
 
 // RegisterPage регистрирует страницу и сохраняет роут в storage
 func (a *Admin) RegisterPage(page *types.Page) *Admin {
 	a.router.RegisterPage(page)
-	
+
 	// Сохраняем роут в storage если он подключен
 	if a.storage != nil {
 		route := &storage.Route{
@@ -91,11 +92,11 @@ func (a *Admin) RegisterPage(page *types.Page) *Admin {
 			Title: page.Title,
 			Type:  "page",
 		}
-		
+
 		// Игнорируем ошибку, чтобы не ломать работу если storage недоступен
 		_ = a.storage.SaveRoute(context.Background(), route)
 	}
-	
+
 	return a
 }
 
@@ -104,7 +105,7 @@ func (a *Admin) GetRoutes(ctx context.Context) ([]*storage.Route, error) {
 	if a.storage == nil {
 		return nil, fmt.Errorf("storage не подключен")
 	}
-	
+
 	return a.storage.GetRoutes(ctx)
 }
 
@@ -113,7 +114,7 @@ func (a *Admin) DeleteRoute(ctx context.Context, id string) error {
 	if a.storage == nil {
 		return fmt.Errorf("storage не подключен")
 	}
-	
+
 	return a.storage.DeleteRoute(ctx, id)
 }
 
@@ -121,27 +122,19 @@ func (a *Admin) DeleteRoute(ctx context.Context, id string) error {
 func (a *Admin) Handler() http.Handler {
 	// Добавляем эндпоинты для работы с роутами через storage
 	if a.storage != nil {
-		// Обертка над основным handler для добавления storage endpoints
-		mux := http.NewServeMux()
-		
-		// Основные роуты админки
-		mux.Handle("/admin/", a.router.Handler())
-		
-		// API для работы с роутами
-		mux.HandleFunc("/api/routes", func(w http.ResponseWriter, r *http.Request) {
-			switch r.Method {
-			case http.MethodGet:
-				a.handleGetRoutes(w, r)
-			case http.MethodDelete:
-				a.handleDeleteRoute(w, r)
-			default:
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			}
-		})
-		
-		return mux
+		// Создаем map с обработчиками
+		handlers := map[string]http.HandlerFunc{
+			"getRoutes":   a.handleGetRoutes,
+			"getRoute":    a.handleGetRoute,
+			"createRoute": a.handleCreateRoute,
+			"updateRoute": a.handleUpdateRoute,
+			"deleteRoute": a.handleDeleteRoute,
+		}
+
+		// Устанавливаем обработчики в роутер
+		a.router.SetStorageHandlers(handlers)
 	}
-	
+
 	return a.router.Handler()
 }
 
@@ -149,36 +142,101 @@ func (a *Admin) Handler() http.Handler {
 func (a *Admin) handleGetRoutes(w http.ResponseWriter, r *http.Request) {
 	routes, err := a.GetRoutes(r.Context())
 	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": false,
-			"error":   err.Error(),
-		})
+		a.sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+
+	a.sendJSON(w, map[string]interface{}{
 		"success": true,
 		"routes":  routes,
 	})
 }
 
+// handleGetRoute обрабатывает получение роута по ID
+func (a *Admin) handleGetRoute(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		a.sendError(w, http.StatusBadRequest, "ID is required")
+		return
+	}
+
+	// TODO: Добавить метод GetRoute в storage interface
+	a.sendError(w, http.StatusNotImplemented, "Get route by ID not implemented yet")
+}
+
+// handleCreateRoute обрабатывает создание нового роута
+func (a *Admin) handleCreateRoute(w http.ResponseWriter, r *http.Request) {
+	var route storage.Route
+	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
+		a.sendError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if err := a.storage.SaveRoute(r.Context(), &route); err != nil {
+		a.sendError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	a.sendJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "Route created successfully",
+		"route":   route,
+	})
+}
+
+// handleUpdateRoute обрабатывает обновление роута
+func (a *Admin) handleUpdateRoute(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		a.sendError(w, http.StatusBadRequest, "ID is required")
+		return
+	}
+
+	var route storage.Route
+	if err := json.NewDecoder(r.Body).Decode(&route); err != nil {
+		a.sendError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	route.ID = id
+
+	// TODO: Добавить метод UpdateRoute в storage interface
+	a.sendError(w, http.StatusNotImplemented, "Update route not implemented yet")
+}
+
 // handleDeleteRoute обрабатывает удаление роута
 func (a *Admin) handleDeleteRoute(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	id := chi.URLParam(r, "id")
 	if id == "" {
-		http.Error(w, "ID is required", http.StatusBadRequest)
+		a.sendError(w, http.StatusBadRequest, "ID is required")
 		return
 	}
-	
+
 	if err := a.DeleteRoute(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		a.sendError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	
-	w.WriteHeader(http.StatusNoContent)
+
+	a.sendJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "Route deleted successfully",
+	})
+}
+
+// sendJSON отправляет JSON ответ
+func (a *Admin) sendJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(data)
+}
+
+// sendError отправляет ошибку в формате JSON
+func (a *Admin) sendError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": false,
+		"error":   message,
+	})
 }
 
 // ListenAndServe запускает HTTP сервер на указанном адресе

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -125,66 +124,9 @@ func main() {
 	admin.RegisterForm(settingsForm)
 	admin.RegisterPage(dashboardPage)
 
-	// Создаем дополнительный роутер для API роутов
-	mux := http.NewServeMux()
-	
-	// Основной handler админки
-	mux.Handle("/admin/", admin.Handler())
-	
-	// API endpoint для получения роутов (для UI)
-	mux.HandleFunc("/api/routes", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		routes, err := admin.GetRoutes(r.Context())
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"routes":  routes,
-		})
-	})
-
-	// API endpoint для удаления роута
-	mux.HandleFunc("/api/routes/delete", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			http.Error(w, "ID is required", http.StatusBadRequest)
-			return
-		}
-
-		if err := admin.DeleteRoute(r.Context(), id); err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"error": err.Error(),
-			})
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"message": "Роут успешно удален",
-		})
-	})
-
-	// Главная страница с документацией
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, `
+	// Создаем главную страницу с документацией
+	docsPage := formist.NewPage("docs", "Документация").
+		WithContent(`
 		<html>
 		<head>
 			<title>Go-Formist с Storage</title>
@@ -219,7 +161,19 @@ func main() {
 			</div>
 			
 			<div class="endpoint">
-				<strong>DELETE /api/routes/delete?id={id}</strong> - Удалить роут
+				<strong>GET /api/routes/{id}</strong> - Получить роут по ID
+			</div>
+			
+			<div class="endpoint">
+				<strong>POST /api/routes</strong> - Создать новый роут
+			</div>
+			
+			<div class="endpoint">
+				<strong>PUT /api/routes/{id}</strong> - Обновить роут
+			</div>
+			
+			<div class="endpoint">
+				<strong>DELETE /api/routes/{id}</strong> - Удалить роут
 			</div>
 			
 			<h2>Пример использования с React:</h2>
@@ -239,12 +193,14 @@ fetch('http://localhost:8080/api/routes')
 			</code></pre>
 		</body>
 		</html>
-		`)
-	})
+		`).Build()
+
+	// Регистрируем главную страницу
+	admin.RegisterPage(docsPage)
 
 	fmt.Println("Сервер запущен на http://localhost:8080")
 	fmt.Println("Админка доступна на http://localhost:8080/admin/")
 	fmt.Println("API роутов: http://localhost:8080/api/routes")
 	
-	log.Fatal(http.ListenAndServe(":8080", mux))
+	log.Fatal(http.ListenAndServe(":8080", admin.Handler()))
 }
